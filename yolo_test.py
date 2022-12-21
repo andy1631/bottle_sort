@@ -45,10 +45,11 @@ try:
             cl = res['name']
             pos_min = (int(res['xmin']), int(res['ymin']))
             pos_max = (int(res['xmax']), int(res['ymax']))
-
+            depth_value = depth_frame.get_distance(int((pos_min[0] + pos_max[0]) / 2), 
+                    int((pos_min[1] + pos_max[1]) / 2))
             cv2.rectangle(color_image, pos_min , pos_max, (255, 0, 0), 2)
-            cv2.putText(color_image, str(cl) + ' (' + str(con) + ')', pos_min, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            print(cl + ', ' + str(((pos_min[0] + pos_max[0]) / 2 , pos_min[1])))
+            cv2.putText(color_image, str(cl) + ' (' + str(tuple(((pos_min[0] + pos_max[0]) / 2 , (pos_min[1] + pos_max[1]) / 2, depth_value))) + ')', pos_min, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            print(cl + ', ' + str(((pos_min[0] + pos_max[0]) / 2 , (pos_min[1] + pos_max[1]) / 2, depth_value)))
         
 
         #results.print();

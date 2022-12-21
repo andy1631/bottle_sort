@@ -1,7 +1,29 @@
+import threading
 import torch
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+from queue import Queue 
+
+# Create a global variable to store the preview state
+preview_enabled = False
+
+def model_thread(model_path, q):
+    global preview_enabled
+    # Initialize model, pipeline, depth sensor, and depth scale
+    model, pipeline, depth_sensor, depth_scale = initialize_model(model_path)
+
+    # Run the model in an infinite loop
+    while True:
+        # Get the detected objects from the current frame
+        detected_objects, color_image, depth_colormap = get_detected_objects(model, pipeline, depth_sensor, depth_scale)
+        if not q.empty(): q.get()
+        q.put(detected_objects)
+
+        # Check if preview is enabled
+        if preview_enabled:
+            # Display preview
+            display_preview(color_image, depth_colormap, detected_objects)
 
 def initialize_model(model_path):
     # Load pre-trained YOLOv5 object detection model from file
@@ -71,10 +93,11 @@ def get_detected_objects(model, pipeline, depth_sensor, depth_scale):
         xmin, ymin = int(detection['xmin']), int(detection['ymin'])
         xmax, ymax = int(detection['xmax']), int(detection['ymax'])
 
+        cv2.rectangle(color_image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
         # Compute center coordinates of bounding box
         x_center = (xmin + xmax) // 2
         y_center = (ymin + ymax) // 2
-            # Get depth value at center of bounding box
+        # Get depth value at center of bounding box
         depth_val = depth_frame.get_distance(x_center, y_center)
 
         # Compute 3D position in meters from depth value and scale
@@ -88,25 +111,45 @@ def get_detected_objects(model, pipeline, depth_sensor, depth_scale):
         # Append detected object to list of detected objects
         detected_objects.append({
             'color': color,
-            'position': (x_pos, y_pos, z_pos)
+            'position': (x_pos, y_pos, z_pos),
+            'confidence': conf
         })
 
     return detected_objects, color_image, depth_colormap
- 
 
-def enable_preview(color_image, depth_colormap):
-    # Loop until user presses escape key
-    while True:
-        # Show images
-        cv2.namedWindow("Color", cv2.WINDOW_AUTOSIZE)
-        cv2.namedWindow("Depth", cv2.WINDOW_AUTOSIZE)
-        cv2.imshow("Color", color_image)
-        cv2.imshow("Depth", depth_colormap)
-            # Check if user pressed escape key
+def display_preview(color_image, depth_colormap, detected_objects):
+    # Show images
+    images = np.hstack((color_image, depth_colormap))
+    cv2.imshow('RealSense', images)
+    # Display detected objects in preview window
+    for detection in detected_objects:
+        color = detection['color']
+        position = detection['position']
+        conf = detection['confidence']
+        cv2.putText(color_image, f'{color} ({conf}): {position}', (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        # Check if user pressed escape key
         key = cv2.waitKey(1)
         if key == 27:
-            break
+            cv2.destroyAllWindows()
+            global preview_enabled
+            preview_enabled = False
 
-    # Destroy windows
-    cv2.destroyAllWindows()
 
+def enable_preview():
+    global preview_enabled
+    preview_enabled = True
+
+def disable_preview():
+    global preview_enabled
+    preview_enabled = False
+
+def start_detection(model_path):
+    q = Queue()
+    # Start the model thread
+    thread = threading.Thread(target=model_thread, args=(model_path, q))
+    thread.start()
+    return thread, q;
+
+#def get_object_list():
+    #return detected_objects
