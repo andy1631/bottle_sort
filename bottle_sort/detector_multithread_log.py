@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(leve
 
 # Create logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 # Create a global variable to store the preview state
 preview_enabled = False
@@ -19,14 +20,14 @@ def model_thread(model_path, q):
     global preview_enabled
     # Initialize model, pipeline, depth sensor, and depth scale
     logger.debug('Initializing model...')
-    model, pipeline, depth_sensor, depth_scale = initialize_model(model_path)
+    model, pipeline, depth_intrinsics = initialize_model(model_path)
     logger.debug('Model initialized')
     
     # Run the model in an infinite loop
     while True:
         # Get the detected objects from the current frame
         logger.debug('Getting detected objects...')
-        detected_objects, color_image, depth_colormap = get_detected_objects(model, pipeline, depth_sensor, depth_scale)
+        detected_objects, color_image, depth_colormap = get_detected_objects(model, pipeline, depth_intrinsics)
         if not q.empty(): q.get()
         q.put(detected_objects)
         logger.debug('Got detected objects')
@@ -42,7 +43,7 @@ def initialize_model(model_path):
     # Load pre-trained YOLOv5 object detection model from file
     logger.debug('Loading model...')
     model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
-    model.to(torch.device("cuda:0"))
+    #model.to(torch.device("cuda:0"))
     logger.debug('Model loaded')
 
     # Create pipeline
@@ -67,23 +68,14 @@ def initialize_model(model_path):
 
     # Start streaming
     logger.debug('Starting streaming...')
-    pipeline.start(config)
+    profile = pipeline.start(config)
     logger.debug('Streaming started')
 
-    # Create depth sensor
-    logger.debug('Creating depth sensor...')
-    depth_sensor = pipeline.get_active_profile().get_device().first_depth_sensor()
-    logger.debug('Depth sensor created')
-
-    # Create depth scale
-    logger.debug('Creating depth scale...')
-    depth_scale = depth_sensor.get_depth_scale
-    logger.debug('Depth scale created')
-
+    depth_intrinsics = profile.get_stream(rs.stream.depth).as_video_stream_profile().get_intrinsics()
     # Return initialized model, pipeline, and depth sensor
-    return (model, pipeline, depth_sensor, depth_scale)
+    return (model, pipeline, depth_intrinsics)
 
-def get_detected_objects(model, pipeline, depth_sensor, depth_scale):
+def get_detected_objects(model, pipeline, depth_intrinsics):
     # Wait for new frames
     logger.debug('Waiting for new frames...')
     frames = pipeline.wait_for_frames()
@@ -117,8 +109,8 @@ def get_detected_objects(model, pipeline, depth_sensor, depth_scale):
     detected_objects = []
     for detection in detections.xyxy[0].to_dict(orient="records"):
         # Skip detections with low confidence
-        if detection['confidence'] < 0.80:
-            continue
+        #if detection['confidence'] < 0.80:
+        #    continue
 
         # Get object class and confidence
         cls = detection['name']
@@ -131,16 +123,18 @@ def get_detected_objects(model, pipeline, depth_sensor, depth_scale):
         cv2.rectangle(color_image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
         # Compute center coordinates of bounding box
         x_center = (xmin + xmax) // 2
-        y_center = (ymin + ymax) // 2
+        y_center = ((ymin + ymax) // 2) + 20
         # Get depth value at center of bounding box
         depth_value = depth_frame.get_distance(x_center, y_center)
 
+        pos_x = (x_center - depth_intrinsics.ppx) * depth_value / depth_intrinsics.fx 
+        pos_y = (y_center - depth_intrinsics.ppy) * depth_value / depth_intrinsics.fy
         # Skip object if depth value is invalid
         if np.isnan(depth_value) or np.isinf(depth_value):
             continue
 
         # Append detected object to list
-        detected_objects.append((cls, conf, x_center, y_center, depth_value))
+        detected_objects.append((cls, conf, x_center, y_center, pos_x, pos_y, depth_value))
         logger.info('Detected object: %s with confidence %.2f', cls, conf)
 
     # Return detected objects and color and depth images
@@ -153,7 +147,7 @@ def display_preview(color_image, depth_colormap, detected_objects):
     # Loop over detected objects
     for detection in detected_objects:
         # Get object class, confidence, and coordinates
-        cls, conf, x, y, depth = detection
+        cls, conf, x, y, pos_x, pos_y, depth = detection
 
         # Draw detection on image
         cv2.putText(display_image, f'{cls} ({conf:.2f})', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
