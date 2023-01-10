@@ -1,17 +1,15 @@
-from detector_multithread_log import *
-from dobot_python_api.api.enums import *
-import dobot_python_api as dobot
 import threading
 import numpy as np
 import time
+from detector_multithread_log import *
+#import dobot_python_api as dobot
+#from dobot_python_api.api.enums import *
 
 def get_diff(p1, p2):
     diff = (p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2])
     return diff
 
-def get_robo_point(p, diff):
-    return (p[0] + diff[0], p[1] + diff[1], p[2] + diff[2])
-
+def get_robo_point(p, diff): return (p[0] + diff[0], p[1] + diff[1], p[2] + diff[2]) 
 # Initialize model and start streaming
 #start_detection("../yolov5_model/yolov5n_klopfer/weights/best.pt")
 def print_results(q, dobot_pos):
@@ -41,14 +39,14 @@ def print_results(q, dobot_pos):
 #            i -= 1
 #            continue
 
-t, q = start_detection("yolov5_model/roboflow_s/roboflow_s/weights/best.pt")
+t, q = start_detection("yolov5_model/roboflow_s_lego/weights/best.pt")
 
 # Enable live preview
 enable_preview()
 
 # Get detected objects
 
-
+"""
 conn = dobot.create_connection()
 
 dobot.set_ptp_jump_params(conn, 40.0, 150.0)
@@ -62,6 +60,7 @@ while ind > curr:
 
 dobot.wait(conn, 10000)
 dobot.move(conn, (60.0, -200.0, 80.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ)
+"""
 
 t2 = threading.Thread(target=print_results, args=(q,(60, -200, 70)))
 t2.start()

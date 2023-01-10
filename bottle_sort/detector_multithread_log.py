@@ -114,6 +114,7 @@ def get_detected_objects(model, pipeline, depth_intrinsics):
 
         # Get object class and confidence
         cls = detection['name']
+        if cls == "GreenBottle": continue
         conf = round(detection['confidence'], 2)
 
         # Get bounding box coordinates
@@ -123,7 +124,7 @@ def get_detected_objects(model, pipeline, depth_intrinsics):
         cv2.rectangle(color_image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
         # Compute center coordinates of bounding box
         x_center = (xmin + xmax) // 2
-        y_center = ((ymin + ymax) // 2) + 20
+        y_center = ((ymin + ymax) // 2)
         # Get depth value at center of bounding box
         depth_value = depth_frame.get_distance(x_center, y_center)
 
