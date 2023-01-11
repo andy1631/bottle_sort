@@ -39,7 +39,7 @@ def print_results(q, dobot_pos):
 #            i -= 1
 #            continue
 
-t, q = start_detection("yolov5_model/roboflow_s_lego/weights/best.pt")
+t, q = start_detection("yolov5_model/bottles/weights/best.pt")
 
 # Enable live preview
 enable_preview()
