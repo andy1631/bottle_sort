@@ -90,7 +90,7 @@ def get_detected_objects(image, model):
         cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
 
         # Append detected object to list
-        detected_objects.append(center_pos)
+        detected_objects.append((get_color(image, center_pos), center_pos))
 
     # Return detected objects and color and depth images
     return (detected_objects, image)
