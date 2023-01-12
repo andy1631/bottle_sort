@@ -1,32 +1,28 @@
-import threading
-from detector import *
+import dobot_utils 
+import detector
+
+c1 = dobot_utils.init_dobot('/dev/ttyUSB0')
+#c2 = init_dobot('/dev/ttyUSB1')
+
+model = detector.init_model('../yolov5_model/bottles/weights/best.pt')
+
+pipeline = detector.init_camera()
 
 
-model = init_model('../yolov5_model/bottles/weights/best.pt')
+thread = detector.enable_preview()
 
-pipeline = init_camera()
+bottles = detector.get_detected_objects(detector.get_image(pipeline), model)
 
+bottles = sorted(bottles, key=lambda bottle: bottle[1][0])
 
-def get_bottles():
-    global image
-    for _ in range(2):
-        bottles, image = get_detected_objects(get_image(pipeline), model)
-        return bottles
+for bottle, pos in zip(bottles, dobot_utils.BottlePosition):
+    print(f'pos: {bottle[1]}, color: {bottle[0].value}')
+    dobot_utils.pickup_bottle(c1, pos)
+    delta = dobot_utils.belt_forward(c1)
+    #dobot_utils.place_bottle(c2, bottle[0])
+    dobot_utils.belt_backward(c1, delta)
+    
 
-def preview(): 
-    while True:
-        global image
-        if image == none: image = np.zeros((480, 640, 3), dtype = "uint8")
+thread.join()
 
-        display_preview(image)
-
-def enable_preview():
-    thread = threading.Thread(target=preview)
-    thread.start()
-    return thread
-
-
-enable_preview()
-
-for pos in get_bottles():
-    print(f'pos: {pos}, color: {get_color(image, pos)}')
+thread.kill()

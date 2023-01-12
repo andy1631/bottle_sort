@@ -3,6 +3,16 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2 
 import logging 
+import threading
+import time
+
+from enum import Enum
+
+class Color(Enum):
+    BLUE = "blue"
+    YELLOW = "yellow" 
+    PINK = "pink" 
+
 # Configure logger
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -10,13 +20,16 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(leve
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
+img_lock = threading.Lock()
+
 
 color_ratios = {
-        "blue": (0.0, 0.4, 0.6),
-        "yellow": (0.8, 0.2, 0.0),
-        "pink": (0.7, 0.0, 0.3)
+        Color.BLUE: (0.0, 0.4, 0.6),
+        Color.YELLOW: (0.8, 0.2, 0.0),
+        Color.PINK: (0.7, 0.0, 0.3)
         }
 
+image = np.zeros((480, 640, 3), dtype = "uint8")
 
 def init_camera():
     # Create pipeline
@@ -39,6 +52,7 @@ def init_camera():
     profile = pipeline.start(config)
     logger.debug('Streaming started')
     
+    time.sleep(2.0)
     return pipeline
 
 
@@ -68,10 +82,10 @@ def get_image(pipeline):
     return image
 
 
-def get_detected_objects(image, model):
-        # Run object detection on color image
+def get_detected_objects(color_image, model):
+    # Run object detection on color image
     logger.debug('Running object detection on color image...')
-    detections = model(image).pandas()
+    detections = model(color_image).pandas()
     logger.debug('Object detection finished')
 
     # Loop over detected objects
@@ -87,21 +101,26 @@ def get_detected_objects(image, model):
 
         center_pos = (((xmin + xmax) // 2), ((ymin + ymax) // 2))
 
-        cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
+        cv2.rectangle(color_image, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
 
         # Append detected object to list
-        detected_objects.append((get_color(image, center_pos), center_pos))
+        detected_objects.append((get_color(color_image, center_pos), center_pos))
 
+    with img_lock:
+        global image
+        image = color_image
+    
     # Return detected objects and color and depth images
-    return (detected_objects, image)
+    return detected_objects
 
 def get_color(image, pos):
+    print(f"position: {pos}")
     b, g, r = image[pos[1], pos[0]]
     s = int(b) + int(g) + int(r)
     ratio = (r / s, g / s, b / s)
-    diff = {sum(abs(x - y) for x, y in zip(ratio, color_ratios["blue"])): "blue",
-            sum(abs(x - y) for x, y in zip(ratio, color_ratios["yellow"])): "yellow",
-            sum(abs(x - y) for x, y in zip(ratio, color_ratios["pink"])): "pink"
+    diff = {sum(abs(x - y) for x, y in zip(ratio, color_ratios[Color.BLUE])): Color.BLUE,
+            sum(abs(x - y) for x, y in zip(ratio, color_ratios[Color.YELLOW])): Color.YELLOW,
+            sum(abs(x - y) for x, y in zip(ratio, color_ratios[Color.PINK])): Color.PINK
             }
     print(f"diff: {diff}")
 
@@ -109,14 +128,21 @@ def get_color(image, pos):
     return res 
 
 
+def preview():
+    while True: 
+        with img_lock:
+            # Create image to display
+            cv2.imshow('Preview', image)
+            key = cv2.waitKey(1)
+            if key == 27:
+                cv2.destroyAllWindows()
+                global preview_enabled
+                preview_enabled = False
 
-def display_preview(image):
 
-    # Create image to display
-    cv2.imshow('Preview', image)
-    key = cv2.waitKey(1)
-    if key == 27:
-        cv2.destroyAllWindows()
-        global preview_enabled
-        preview_enabled = False
+def enable_preview():
+    thread = threading.Thread(target=preview)
+    thread.start()
+    return thread
+
 
