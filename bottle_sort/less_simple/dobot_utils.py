@@ -2,10 +2,8 @@ import dobot_python_api as dobot
 import time
 
 from dobot_python_api.api.enums import *
-
-from enum import Enum
-
-from detector import Color
+from enum import Enum 
+from detector import Color 
 
 class BottlePosition(Enum):
     ONE = (205.0, -175.0, 46.0)
@@ -40,27 +38,30 @@ def belt_forward(c):
     return duration
 
 def belt_backward(c, d):
+    dobot.wait(c, 5000)
     dobot.start_belt(c, -0.5)   
     dobot.wait(c, int(d * 1000))
     dobot.stop_belt(c)
 
 
 def place_bottle(c, color):
-    dobot.move(c, (216.0, -153.0, 100, 0), dobot.PTP_MODE.JUMP_XYZ)
+    dobot.move(c, (216.0, -150.0, 105, 0), dobot.PTP_MODE.JUMP_XYZ)
     dobot.set_gripper(c, True, True)
     dobot.wait(c, 1000)
+    
+    ind = 0
 
     match color:
         case Color.BLUE:
             dobot.move(c, (0.0, 0.0, 40.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ_INC)
-            dobot.move(c, (150.0, 250.0, 100.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ)
-            dobot.move(c, (145.0, 250.0, 51.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ)
+            ind = dobot.move(c, (150.0, 245.0, 100.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ)
+            dobot.move(c, (145.0, 245.0, 55.0, 0.0), dobot.PTP_MODE.MOVJ_XYZ)
 
         case Color.YELLOW:
-            dobot.move(c, (96.0, 250.0, 51.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
+            ind = dobot.move(c, (96.0, 245.0, 55.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
 
         case Color.PINK:
-            dobot.move(c, (45.0, 250.0, 51.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
+            ind = dobot.move(c, (45.0, 245.0, 55.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
 
 
     dobot.set_gripper(c, True, False)
@@ -68,6 +69,7 @@ def place_bottle(c, color):
     dobot.set_gripper(c, False, False)
 
     dobot.move(c, home_pos, dobot.PTP_MODE.JUMP_XYZ)
+    return ind
 
 def pickup_bottle(c, pos):
 
@@ -77,10 +79,17 @@ def pickup_bottle(c, pos):
 
     dobot.wait(c, 1000)
 
-    dobot.move(c, (216.0, 102.0, 103.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
+    dobot.move(c, (220.0, 102.0, 103.0, 0.0), dobot.PTP_MODE.JUMP_XYZ)
 
     dobot.set_gripper(c, True, False)
     dobot.wait(c, 1000)
     dobot.set_gripper(c, False, False)
 
     dobot.move(c, home_pos, dobot.PTP_MODE.JUMP_XYZ)
+
+
+def wait_for(c2, ind):
+    curr = dobot.get_queued_cmd_current_index(c2)
+    while(ind > curr):
+        curr = dobot.get_queued_cmd_current_index(c2)
+

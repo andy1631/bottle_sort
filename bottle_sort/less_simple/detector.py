@@ -29,7 +29,7 @@ color_ratios = {
         Color.PINK: (0.7, 0.0, 0.3)
         }
 
-image = np.zeros((480, 640, 3), dtype = "uint8")
+image = np.zeros((720, 1280, 3), dtype = "uint8")
 
 def init_camera():
     # Create pipeline
@@ -44,7 +44,7 @@ def init_camera():
 
     # Enable color stream
     logger.debug('Enabling color stream...')
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
     logger.debug('Color stream enabled')
 
     # Start streaming
@@ -129,9 +129,13 @@ def get_color(image, pos):
 
 
 def preview():
+    global image
     while True: 
         with img_lock:
+            cv2.namedWindow('Preview', cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty('Preview', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             # Create image to display
+            image = cv2.resize(image, (1920, 1080))
             cv2.imshow('Preview', image)
             key = cv2.waitKey(1)
             if key == 27:

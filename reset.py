@@ -5,7 +5,7 @@ import time
 
 from dobot_python_api.api.enums import *
 
-conn = dobot.create_connection()
+conn = dobot.create_connection('/dev/ttyUSB0')
 
 dobot.stop_belt(conn)
 dobot.set_gripper(conn, True, False)
